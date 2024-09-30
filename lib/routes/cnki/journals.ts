@@ -66,8 +66,7 @@ async function handler(ctx) {
     const list = publications
         .map((_, publication) => {
             const title = $(publication).find('a').first().text();
-            const filename = $(publication).find('b').attr('id');
-            const link = `https://cnki.net/kcms/detail/detail.aspx?filename=${filename}&dbcode=CJFD`;
+            const link = $(publication).find('a').attr()?.href;
 
             return {
                 title,
