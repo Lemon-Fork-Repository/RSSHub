@@ -1,8 +1,12 @@
 import { createFetch } from 'ofetch';
 import { config } from '@/config';
 import logger from '@/utils/logger';
+import { Agent } from 'undici';
+
+const unsecureAgent = new Agent({ connect: { rejectUnauthorized: false } });
 
 const rofetch = createFetch().create({
+    dispatcher: unsecureAgent,
     retryStatusCodes: [400, 408, 409, 425, 429, 500, 502, 503, 504],
     retry: config.requestRetry,
     retryDelay: 1000,

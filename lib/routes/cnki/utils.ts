@@ -10,15 +10,15 @@ const ProcessItem = async (item) => {
     const detailResponse = await got(item.link);
     const $ = load(detailResponse.data);
     item.description = art(path.join(__dirname, 'templates/desc.art'), {
-        author: $('h3.author > span')
-            .map((_, item) => $(item).text())
+        author: $('#authorpart > span')
+            .map((_, item) => $(item).text().trim())
             .get()
             .join(' '),
-        company: $('a.author')
-            .map((_, item) => $(item).text())
+        company: $('h3.author:not(#authorpart) > span')
+            .map((_, item) => $(item).text().trim())
             .get()
             .join(' '),
-        content: $('div.row > span.abstract-text').parent().text(),
+        content: $('#abstract_text').attr()?.value.trim(),
     });
 
     return item;

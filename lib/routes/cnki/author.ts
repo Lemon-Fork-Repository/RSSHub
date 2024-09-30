@@ -7,10 +7,10 @@ import { ProcessItem } from './utils';
 const rootUrl = 'https://kns.cnki.net';
 
 export const route: Route = {
-    path: '/author/:code',
+    path: '/author/:v',
     categories: ['journal'],
-    example: '/cnki/author/000042423923',
-    parameters: { code: '作者对应code，可以在网址中得到' },
+    example: '/cnki/author/KqXyGY4RJv3vDj-T0lsHgLz0TF-lQcv7oV5b_ya7VBbAwNiDNufbC8Qxcgy0pBOUJ46yC5F3j3bJFPdRLsjdiTAS2Xmi12cGWo7qKklOUj2izJqUS-wfL4GKU7aZv0o-',
+    parameters: { code: '作者详情页对应value，可以在网址中得到' },
     features: {
         requireConfig: false,
         requirePuppeteer: false,
@@ -28,44 +28,28 @@ export const route: Route = {
 };
 
 async function handler(ctx) {
-    const code = ctx.req.param('code');
-
-    const authorInfoUrl = `${rootUrl}/kcms/detail/knetsearch.aspx?sfield=au&code=${code}`;
-    const res = await got(authorInfoUrl);
+    const v_code = ctx.req.param('v');
+    const author_detail_url = `${rootUrl}/kcms2/author/detail?v=${v_code}`;
+    const res = await got.get(author_detail_url);
     const $ = load(res.data);
-    const authorName = $('#showname').text();
-    const companyName = $('body > div.wrapper > div.main > div.container.full-screen > div > div:nth-child(3) > h3:nth-child(2) > span > a').text();
+    const author_name = $('#showname').text();
+    const company_name = $('#kcms-author-info > h3:nth-child(5) > span > a').text();
 
-    const res2 = await got(`${rootUrl}/kns8/Detail`, {
-        searchParams: {
-            sdb: 'CAPJ',
-            sfield: '作者',
-            skey: authorName,
-            scode: code,
-            acode: code,
-        },
-        followRedirect: false,
-    });
-    const authorPageUrl = res2.headers.location;
+    const url = `${rootUrl}/restapi/knowledge-api/v1/experts/relations/resources?v=${v_code}&sequence=PT&size=10&sort=desc&start=1&resource=CJFD`;
 
-    const regex = /v=([^&]+)/;
-    const code2 = authorPageUrl.match(regex)[1];
-
-    const url = `${rootUrl}/restapi/knowledge-api/v1/experts/relations/resources?v=${code2}&sequence=PT&size=10&sort=desc&start=1&resource=CJFD`;
-
-    const res3 = await got(url, { headers: { Referer: authorPageUrl } });
+    const res3 = await got(url);
     const publications = res3.data.data.data;
 
     const list = publications.map((publication) => {
         const metadata = publication.metadata;
         const { value: title = '' } = metadata.find((md) => md.name === 'TI') || {};
         const { value: date = '' } = metadata.find((md) => md.name === 'PT') || {};
-        const { value: filename = '' } = metadata.find((md) => md.name === 'FN') || {};
+        const { url: link = '' } = publication.relations.find((rel) => rel.scope === 'ABSTRACT') || {};
 
         return {
             title,
-            link: `https://cnki.net/kcms/detail/detail.aspx?filename=${filename}&dbcode=CJFD`,
-            author: authorName,
+            link,
+            author: author_name,
             pubDate: date,
         };
     });
@@ -73,8 +57,8 @@ async function handler(ctx) {
     const items = await Promise.all(list.map((item) => cache.tryGet(item.link, () => ProcessItem(item))));
 
     return {
-        title: `知网 ${authorName} ${companyName}`,
-        link: authorInfoUrl,
+        title: `知网 ${author_name} ${company_name}`,
+        link: author_detail_url,
         item: items,
     };
 }
