@@ -3,7 +3,7 @@ import logger from '@/utils/logger';
 import got from '@/utils/got';
 import { load } from 'cheerio';
 import cache from '@/utils/cache';
-import { ProcessItem } from '@/routes/cnki/utils';
+import { hashCode, ProcessItem } from '@/routes/cnki/utils';
 
 export const route: Route = {
     path: '/keyword/:keyword/:categories?',
@@ -136,6 +136,7 @@ async function handler(ctx) {
                 link,
                 author: author_name,
                 pubDate: date,
+                guid: hashCode(title + author_name),
             };
         })
         .get();

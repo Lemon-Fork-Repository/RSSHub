@@ -29,4 +29,18 @@ const ProcessItem = async (item) => {
     return item;
 };
 
-export { ProcessItem };
+function hashCode(item: string) {
+    let hash = 0,
+        chr;
+    if (item.length === 0) {
+        return hash;
+    }
+    for (let i = 0; i < item.length; i++) {
+        chr = item.codePointAt(i);
+        hash = (hash << 5) - hash + chr;
+        hash = Math.trunc(hash); // Convert to 32bit integer
+    }
+    return hash;
+}
+
+export { ProcessItem, hashCode };

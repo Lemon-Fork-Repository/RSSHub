@@ -1,7 +1,7 @@
 import { Route } from '@/types';
 import cache from '@/utils/cache';
 import got from '@/utils/got';
-import { ProcessItem } from './utils';
+import { hashCode, ProcessItem } from './utils';
 import logger from '@/utils/logger';
 import { load } from 'cheerio';
 
@@ -76,6 +76,7 @@ async function handler(ctx) {
             author: author_name,
             pubDate: date,
             itunes_item_image,
+            guid: hashCode(title + author_name),
         };
     });
 

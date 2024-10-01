@@ -3,7 +3,7 @@ import cache from '@/utils/cache';
 import got from '@/utils/got';
 import { load } from 'cheerio';
 import { parseDate } from '@/utils/parse-date';
-import { ProcessItem } from './utils';
+import { hashCode, ProcessItem } from './utils';
 import logger from '@/utils/logger';
 
 const rootUrl = 'https://navi.cnki.net';
@@ -72,6 +72,7 @@ async function handler(ctx) {
                 title,
                 link,
                 pubDate: date,
+                guid: hashCode(title + name),
             };
         })
         .get();
