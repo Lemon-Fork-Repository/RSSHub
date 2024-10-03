@@ -1,9 +1,9 @@
-import { Route } from '@/types';
+import { Data, DataItem, Route } from '@/types';
 import logger from '@/utils/logger';
 import got from '@/utils/got';
 import { load } from 'cheerio';
 import cache from '@/utils/cache';
-import { hashCode, ProcessItem } from '@/routes/cnki/utils';
+import { generateGuid, ProcessItem } from '@/routes/cnki/utils';
 
 export const route: Route = {
     path: '/keyword/:keyword/:categories?',
@@ -35,7 +35,9 @@ const map_type = {
     AMI: 'AMI',
 };
 
-async function handler(ctx) {
+const rootUrl = 'https://kns.cnki.net';
+
+async function handler(ctx): Promise<Data> {
     const { keyword, categories } = ctx.req.param();
     let groups =
         categories?.split(',')?.map((category, index) => ({
@@ -111,7 +113,7 @@ async function handler(ctx) {
         SearchFrom: 1,
     };
 
-    const res = await got.post('https://kns.cnki.net/kns8s/brief/grid', {
+    const res = await got.post(`${rootUrl}/kns8s/brief/grid`, {
         form: {
             boolSortSearch: 'true',
             QueryJson: JSON.stringify(query_josn),
@@ -122,6 +124,7 @@ async function handler(ctx) {
         },
     });
 
+    const now = new Date();
     const $ = load(res.data);
     const list = $('#gridTable tbody tr')
         .map((_, data) => {
@@ -136,16 +139,17 @@ async function handler(ctx) {
                 link,
                 author: author_name,
                 pubDate: date,
-                guid: hashCode(title + author_name),
-            };
+                updated: now,
+                guid: generateGuid(title + author_name),
+            } as DataItem;
         })
         .get();
 
-    const items = await Promise.all(list.map((item) => cache.tryGet(item.link, () => ProcessItem(item))));
+    const items = await Promise.all(list.map((item) => cache.tryGet(item.guid!, () => ProcessItem(item))));
 
     return {
         title: `知网 - ${keyword}` + (categories ? ` - ${categories}` : ''),
-        link: 'https://kns.cnki.net/kns8s/AdvSearch',
+        link: `${rootUrl}/kns8s/AdvSearch`,
         item: items,
-    };
+    } as Data;
 }

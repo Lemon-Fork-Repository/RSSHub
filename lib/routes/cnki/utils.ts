@@ -4,10 +4,12 @@ import { load } from 'cheerio';
 import { art } from '@/utils/render';
 import path from 'node:path';
 import logger from '@/utils/logger';
+import crypto from 'crypto';
+import { DataItem } from '@/types';
 
 const __dirname = getCurrentPath(import.meta.url);
 
-const ProcessItem = async (item) => {
+const ProcessItem = async (item: DataItem) => {
     try {
         const detailResponse = await got(item.link);
         const $ = load(detailResponse.data);
@@ -29,18 +31,10 @@ const ProcessItem = async (item) => {
     return item;
 };
 
-function hashCode(item: string) {
-    let hash = 0,
-        chr;
-    if (item.length === 0) {
-        return hash;
-    }
-    for (let i = 0; i < item.length; i++) {
-        chr = item.codePointAt(i);
-        hash = (hash << 5) - hash + chr;
-        hash = Math.trunc(hash); // Convert to 32bit integer
-    }
-    return hash;
+function generateGuid(t: string) {
+    const hash = crypto.createHash('sha512');
+    hash.update(t);
+    return hash.digest('hex').toUpperCase();
 }
 
-export { ProcessItem, hashCode };
+export { ProcessItem, generateGuid };

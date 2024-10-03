@@ -1,15 +1,11 @@
-import { Route } from '@/types';
-import { getCurrentPath } from '@/utils/helpers';
-const __dirname = getCurrentPath(import.meta.url);
-
+import { Data, DataItem, Route } from '@/types';
 import cache from '@/utils/cache';
 import got from '@/utils/got';
 import { load } from 'cheerio';
 import { parseDate } from '@/utils/parse-date';
-import { art } from '@/utils/render';
-import path from 'node:path';
+import { generateGuid, ProcessItem } from '@/routes/cnki/utils';
 
-const rootUrl = 'https://chn.oversea.cnki.net';
+const rootUrl = 'https://kns.cnki.net';
 
 export const route: Route = {
     path: '/journals/debut/:name',
@@ -37,10 +33,10 @@ export const route: Route = {
 async function handler(ctx) {
     const name = ctx.req.param('name');
 
-    const journalUrl = `${rootUrl}/knavi/JournalDetail?pcode=CjFD&pykm=${name}`;
+    const journalUrl = `${rootUrl}/knavi/journals/${name}/detail`;
     const title = await got.get(journalUrl).then((res) => load(res.data)('head > title').text());
 
-    const outlineUrl = `${rootUrl}/knavi/JournalDetail/GetnfAllOutline`;
+    const outlineUrl = `${rootUrl}/knavi/journals/${name}/papers/outline`;
     const response = await got({
         method: 'post',
         url: outlineUrl,
@@ -48,43 +44,31 @@ async function handler(ctx) {
             pageIdx: '0',
             type: '2',
             pcode: 'CJFD',
-            pykm: name,
+            epub: 0,
         },
     });
     const $ = load(response.data);
+    const now = new Date();
     const list = $('dd')
-        .map((_, item) => ({
-            title: $(item).find('span.name > a').text().trim(),
-            link: `${rootUrl}/kcms/detail/${new URLSearchParams(new URL(`${rootUrl}/${$(item).find('span.name > a').attr('href')}`).search).get('url')}.html`,
-            pubDate: parseDate($(item).find('span.company').text(), 'YYYY-MM-DD HH:mm:ss'),
-        }))
+        .map((_, item) => {
+            const a_ele = $(item).find('span.name > a');
+            const title = a_ele.text().trim();
+            return {
+                title,
+                link: a_ele.attr('href'),
+                pubDate: parseDate($(item).find('span.company').text(), 'YYYY-MM-DD HH:mm:ss'),
+                updated: now,
+                guid: generateGuid(name + title),
+            } as DataItem;
+        })
         .get();
 
-    const items = await Promise.all(
-        list.map((item) =>
-            cache.tryGet(item.link, async () => {
-                const detailResponse = await got.get(item.link);
-                const $ = load(detailResponse.data);
-                item.description = art(path.join(__dirname, 'templates/desc.art'), {
-                    author: $('h3.author > span')
-                        .map((_, item) => $(item).text())
-                        .get()
-                        .join(' '),
-                    company: $('a.author')
-                        .map((_, item) => $(item).text())
-                        .get()
-                        .join(' '),
-                    content: $('div.row > span.abstract-text').parent().text(),
-                });
-
-                return item;
-            })
-        )
-    );
+    const items = await Promise.all(list.map((item) => cache.tryGet(item.guid!, () => ProcessItem(item))));
 
     return {
         title: `${title} - 全网首发`,
         link: `https://navi.cnki.net/knavi/journals/${name}/detail`,
+        allowEmpty: true,
         item: items,
-    };
+    } as Data;
 }

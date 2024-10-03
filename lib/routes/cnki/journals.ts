@@ -1,9 +1,9 @@
-import { Route } from '@/types';
+import { Data, DataItem, Route } from '@/types';
 import cache from '@/utils/cache';
 import got from '@/utils/got';
 import { load } from 'cheerio';
 import { parseDate } from '@/utils/parse-date';
-import { hashCode, ProcessItem } from './utils';
+import { generateGuid, ProcessItem } from './utils';
 import logger from '@/utils/logger';
 
 const rootUrl = 'https://navi.cnki.net';
@@ -52,7 +52,7 @@ async function handler(ctx) {
         .then((res) => {
             const $ = load(res.data);
             const code = $('.yearissuepage').find('dl').first().find('dd').find('a').first().attr('value');
-            const date = parseDate($('.yearissuepage').find('dl').first().find('dd').find('a').first().attr('id').replace('yq', ''), 'YYYYMM');
+            const date = parseDate($('.yearissuepage > dl > dd > a').attr('id')?.replace('yq', '') || '', 'YYYYMM');
             return { code, date };
         });
     logger.info(`code: ${code}, date: ${date}`);
@@ -63,25 +63,29 @@ async function handler(ctx) {
     const $ = load(response.data);
     const publications = $('dd');
 
-    const list = publications
+    const now = new Date();
+    const list: DataItem[] = publications
         .map((_, publication) => {
             const title = $(publication).find('a').first().text();
             const link = $(publication).find('a').attr('href');
+            const author = $(publication).find('span.author').text();
 
             return {
                 title,
                 link,
+                author,
                 pubDate: date,
-                guid: hashCode(title + name),
-            };
+                updated: now,
+                guid: generateGuid(title + name),
+            } as DataItem;
         })
         .get();
 
-    const items = await Promise.all(list.map((item) => cache.tryGet(item.link, () => ProcessItem(item))));
+    const items = await Promise.all(list.map((item) => cache.tryGet(item.guid!, () => ProcessItem(item))));
 
     return {
         title: `期刊 ${title}`,
         link: journalUrl,
         item: items,
-    };
+    } as Data;
 }

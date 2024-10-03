@@ -1,7 +1,7 @@
-import { Route } from '@/types';
+import { Data, DataItem, Route } from '@/types';
 import cache from '@/utils/cache';
 import got from '@/utils/got';
-import { hashCode, ProcessItem } from './utils';
+import { generateGuid, ProcessItem } from './utils';
 import logger from '@/utils/logger';
 import { load } from 'cheerio';
 
@@ -63,6 +63,7 @@ async function handler(ctx) {
     const res3 = await got(url);
     const publications = res3.data.data.data;
 
+    const now = new Date();
     const list = publications.map((publication) => {
         const metadata = publication.metadata;
         const { value: title = '' } = metadata.find((md) => md.name === 'TI') || {};
@@ -76,15 +77,16 @@ async function handler(ctx) {
             author: author_name,
             pubDate: date,
             itunes_item_image,
-            guid: hashCode(title + author_name),
-        };
+            updated: now,
+            guid: generateGuid(title + author_name),
+        } as DataItem;
     });
 
-    const items = await Promise.all(list.map((item) => cache.tryGet(item.link, () => ProcessItem(item))));
+    const items = await Promise.all(list.map((item) => cache.tryGet(item.guid!, () => ProcessItem(item))));
 
     return {
         title: `知网 ${author_name} ${company_name}`,
         link: author_detail_link,
         item: items,
-    };
+    } as Data;
 }
