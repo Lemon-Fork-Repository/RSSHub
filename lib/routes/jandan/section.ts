@@ -1,43 +1,84 @@
-import { Route } from '@/types';
+import { Data, DataItem, Route } from '@/types';
 import got from '@/utils/got';
 import { load } from 'cheerio';
 import { parseDate } from '@/utils/parse-date';
+import { trimTitleDesc } from '@/routes/jandan/utils';
+import type { Context } from 'hono';
 
 export const route: Route = {
     path: '/:category',
-    name: 'Unknown',
-    maintainers: [],
+    example: '/top',
+    name: '煎蛋分类',
+    maintainers: ['lemon'],
     handler,
+    description: `妹子图和 BBS 不支持此路由`,
+    parameters: {
+        category: {
+            description: '分类',
+            default: 'top',
+            options: [
+                { value: 'qa', label: '问答' },
+                { value: 'treehole', label: '树洞' },
+                {
+                    value: 'ooxx',
+                    label: '随手拍',
+                },
+                { value: 'pic', label: '无聊图' },
+                { value: 'top', label: '煎蛋热门内容排行榜' },
+                {
+                    value: 'top-4h',
+                    label: '四小时热门',
+                },
+                { value: 'top-tucao', label: '集合24小时内最棒的吐槽' },
+                {
+                    value: 'top-ooxx',
+                    label: '热榜 - 随手拍',
+                },
+                { value: 'top-comments', label: '热榜 - 树洞' },
+                {
+                    value: 'top-3days',
+                    label: '煎蛋内容三日热榜',
+                },
+                { value: 'top-7days', label: '煎蛋内容七日热榜' },
+            ],
+        },
+    },
 };
+const rootUrl = 'https://i.jandan.net';
+const webUrl = 'https://jandan.net';
 
-async function handler(ctx) {
+async function handler(ctx: Context) {
     const category = ctx.req.param('category') ?? 'top';
 
-    const rootUrl = 'http://i.jandan.net';
     const currentUrl = `${rootUrl}/${category}`;
 
+    const { items, title } = await crawl(currentUrl, ctx.req.query('limit') ? Number.parseInt(ctx.req.query('limit')!) : 30, category, []);
+
+    return {
+        title: `${title} - 煎蛋`,
+        link: `${webUrl}/${category}`,
+        item: items,
+    } as Data;
+}
+
+async function crawl(url: string, limit: number, title: string, items: DataItem[]) {
+    if (items.length >= limit) {
+        return { items, title };
+    }
     const response = await got({
         method: 'get',
-        url: currentUrl,
+        url,
     });
 
     const $ = load(response.data);
 
-    const items = $('ol.commentlist li')
+    const new_item = $('ol.commentlist li')
         .not('.row')
-        .slice(0, ctx.req.query('limit') ? Number.parseInt(ctx.req.query('limit')) : 50)
         .toArray()
-        .map((item) => {
-            item = $(item);
+        .map((e) => {
+            const item = $(e);
 
-            item.find('.commenttext img, .tucao-report').remove();
-
-            item.find('.commenttext .view_img_link').each(function () {
-                const url = new URL($(this).attr('href'), rootUrl);
-                url.protocol = 'https:';
-                url.host = url.host.replace('moyu.im', 'sinaimg.cn');
-                $(this).replaceWith(`<img src="${url}">`);
-            });
+            // item.find('.commenttext img, .tucao-report').remove();
 
             const author = item.find('b').first().text();
             const description = item.find('.commenttext');
@@ -45,15 +86,20 @@ async function handler(ctx) {
             return {
                 author,
                 description: description.html(),
-                title: `${author}: ${description.text()}`,
+                title: trimTitleDesc(author, description.text()),
                 pubDate: parseDate(item.find('.time').text()),
-                link: `${rootUrl}/t/${item.attr('id').split('-').pop()}`,
-            };
+                link: `${webUrl}/t/${item.attr('id')!.split('-').pop()}`,
+            } as DataItem;
         });
+    items.push(...new_item);
+    title = $('title').text();
 
+    const nextUrl = $('a.previous-comment-page').attr('href');
+    if (nextUrl) {
+        return crawl(`https:${nextUrl}`, limit, title, items);
+    }
     return {
-        title: `${$('title').text()} - 煎蛋`,
-        link: currentUrl,
-        item: items,
+        items,
+        title,
     };
 }
