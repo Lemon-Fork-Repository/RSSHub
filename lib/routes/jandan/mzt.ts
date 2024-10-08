@@ -1,5 +1,6 @@
-import { Data, DataItem, Route } from '@/types';
+import { Data, DataItem, Route, ViewType } from '@/types';
 import got from '@/utils/got';
+import { Context } from 'hono';
 
 export const route: Route = {
     path: '/mzt',
@@ -7,10 +8,13 @@ export const route: Route = {
     example: '/mzt',
     maintainers: ['lemon'],
     handler,
+    view: ViewType.Pictures,
 };
 
-async function handler(): Promise<Data> {
-    const items = await crawl();
+async function handler(ctx: Context): Promise<Data> {
+    const limit = ctx.req.query('limit') ? Number.parseInt(ctx.req.query('limit')!) : 30;
+
+    const items = await crawl(undefined, limit, []);
 
     return {
         title: '妹子图 - 煎蛋',
@@ -44,7 +48,7 @@ async function crawl(start_id?: string, limit: number = 30, items: DataItem[] = 
                 author: item.author,
             }) as DataItem
     );
-    const last_id = res_data?.at(-1)?.id;
+    const last_id = data?.at(-1)?.id;
     if (last_id) {
         return crawl(last_id, limit, [...items, ...res_data]);
     }
