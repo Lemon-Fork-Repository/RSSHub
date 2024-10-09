@@ -1,6 +1,6 @@
 import { Data, DataItem, Route, ViewType } from '@/types';
-import got from '@/utils/got';
 import { Context } from 'hono';
+import ofetch from '@/utils/ofetch';
 
 export const route: Route = {
     path: '/mzt',
@@ -14,7 +14,7 @@ export const route: Route = {
 async function handler(ctx: Context): Promise<Data> {
     const limit = ctx.req.query('limit') ? Number.parseInt(ctx.req.query('limit')!) : 30;
 
-    const items = await crawl(undefined, limit, []);
+    const items = await crawl(ctx, limit);
 
     return {
         title: '妹子图 - 煎蛋',
@@ -23,12 +23,19 @@ async function handler(ctx: Context): Promise<Data> {
     };
 }
 
-async function crawl(start_id?: string, limit: number = 30, items: DataItem[] = []): Promise<DataItem[]> {
+async function crawl(ctx: Context, limit: number = 30) {
+    const data = await _crawl(undefined, limit, []);
+    // set debug info
+    ctx.set('json', data);
+    return data;
+}
+
+async function _crawl(start_id?: string, limit: number = 30, items: DataItem[] = []): Promise<DataItem[]> {
     if (items.length >= limit) {
         return items;
     }
 
-    const response = await got(`https://api.jandan.net/api/v1/comment/list/108629${start_id ? `?start_id=${start_id}` : ''}`, { responseType: 'json' });
+    const response = await ofetch(`https://api.jandan.net/api/v1/comment/list/108629${start_id ? `?start_id=${start_id}` : ''}`);
     const data: {
         id: string;
         author: string;
@@ -36,7 +43,7 @@ async function crawl(start_id?: string, limit: number = 30, items: DataItem[] = 
         vote_positive: string;
         vote_negative: string;
         images: { url: string; full_url: string }[];
-    }[] = response.data.data;
+    }[] = response.data;
 
     const res_data = data.map(
         (item) =>
@@ -50,7 +57,7 @@ async function crawl(start_id?: string, limit: number = 30, items: DataItem[] = 
     );
     const last_id = data?.at(-1)?.id;
     if (last_id) {
-        return crawl(last_id, limit, [...items, ...res_data]);
+        return _crawl(last_id, limit, [...items, ...res_data]);
     }
     return [...items, ...res_data];
 }
