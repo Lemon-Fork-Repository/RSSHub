@@ -43,3 +43,4 @@ vercel.json
 
 # rsshub auxiliary files
 lib/routes/**/radar.js
+rsshub-remote-config

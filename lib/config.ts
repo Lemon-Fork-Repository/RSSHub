@@ -1,5 +1,7 @@
 import randUserAgent from '@/utils/rand-user-agent';
 import 'dotenv/config';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { ofetch } from 'ofetch';
 
 let envs = process.env;
@@ -387,19 +389,24 @@ const calculateValue = () => {
         isPackage: !!envs.IS_PACKAGE,
         nodeName: envs.NODE_NAME,
         puppeteerWSEndpoint: envs.PUPPETEER_WS_ENDPOINT,
-        chromiumExecutablePath: envs.CHROMIUM_EXECUTABLE_PATH,
-        // network
+        chromiumExecutablePath: envs.CHROMIUM_EXECUTABLE_PATH, // network
         connect: {
             port: toInt(envs.PORT, 1200), // 监听端口
         },
         listenInaddrAny: toBoolean(envs.LISTEN_INADDR_ANY, true), // 是否允许公网连接，取值 0 1
         requestRetry: toInt(envs.REQUEST_RETRY, 2), // 请求失败重试次数
         requestTimeout: toInt(envs.REQUEST_TIMEOUT, 30000), // Milliseconds to wait for the server to end the response before aborting the request
-        ua: envs.UA ?? (toBoolean(envs.NO_RANDOM_UA, false) ? TRUE_UA : randUserAgent({ browser: 'chrome', os: 'mac os', device: 'desktop' })),
-        trueUA: TRUE_UA,
-        // cors request
-        allowOrigin: envs.ALLOW_ORIGIN,
-        // cache
+        ua:
+            envs.UA ??
+            (toBoolean(envs.NO_RANDOM_UA, false)
+                ? TRUE_UA
+                : randUserAgent({
+                      browser: 'chrome',
+                      os: 'mac os',
+                      device: 'desktop',
+                  })),
+        trueUA: TRUE_UA, // cors request
+        allowOrigin: envs.ALLOW_ORIGIN, // cache
         cache: {
             type: envs.CACHE_TYPE || (envs.CACHE_TYPE === '' ? '' : 'memory'), // 缓存类型，支持 'memory' 和 'redis'，设为空可以禁止缓存
             requestTimeout: toInt(envs.CACHE_REQUEST_TIMEOUT, 60),
@@ -412,8 +419,7 @@ const calculateValue = () => {
         },
         redis: {
             url: envs.REDIS_URL || 'redis://localhost:6379/',
-        },
-        // proxy
+        }, // proxy
         proxyUri: envs.PROXY_URI,
         proxy: {
             protocol: envs.PROXY_PROTOCOL,
@@ -424,10 +430,8 @@ const calculateValue = () => {
             strategy: envs.PROXY_STRATEGY || 'all', // all / on_retry
         },
         pacUri: envs.PAC_URI,
-        pacScript: envs.PAC_SCRIPT,
-        // access control
-        accessKey: envs.ACCESS_KEY,
-        // logging
+        pacScript: envs.PAC_SCRIPT, // access control
+        accessKey: envs.ACCESS_KEY, // logging
         // 是否显示 Debug 信息，取值 'true' 'false' 'some_string' ，取值为 'true' 时永久显示，取值为 'false' 时永远隐藏，取值为 'some_string' 时请求带上 '?debug=some_string' 显示
         debugInfo: envs.DEBUG_INFO || 'true',
         loggerLevel: envs.LOGGER_LEVEL || 'info',
@@ -440,8 +444,7 @@ const calculateValue = () => {
         sentry: {
             dsn: envs.SENTRY,
             routeTimeout: toInt(envs.SENTRY_ROUTE_TIMEOUT, 30000),
-        },
-        // feed config
+        }, // feed config
         hotlink: {
             template: envs.HOTLINK_TEMPLATE,
             includePaths: envs.HOTLINK_INCLUDE_PATHS ? envs.HOTLINK_INCLUDE_PATHS.split(',') : undefined,
@@ -743,16 +746,26 @@ calculateValue();
     if (envs.REMOTE_CONFIG) {
         const { default: logger } = await import('@/utils/logger');
         try {
-            const data = await ofetch(envs.REMOTE_CONFIG, {
+            const response = await ofetch.raw(envs.REMOTE_CONFIG, {
                 headers: {
                     Authorization: `Basic ${envs.REMOTE_CONFIG_AUTH}`,
                 },
             });
-            if (data) {
+            const data: Record<string, any> = response._data;
+            const p = path.join(process.cwd(), 'rsshub-remote-config');
+            if (response.ok && data) {
+                const hash_md5 = response.headers.get('content-md5');
+                if (hash_md5) {
+                    await fs.writeFile(p, hash_md5);
+                    logger.info('Remote config hash saved in', { message: p });
+                }
+                logger.info('Remote config', { message: JSON.stringify(data) });
                 envs = Object.assign(envs, data);
                 calculateValue();
                 logger.info('Remote config loaded.');
             } else {
+                // empty cache md5 file
+                await fs.writeFile(p, '');
                 logger.error('Remote config load failed.');
             }
         } catch (error) {
