@@ -14,7 +14,7 @@ services:
       CACHE_TYPE: redis
       REDIS_URL: "redis://redis:6379/"
       PUPPETEER_WS_ENDPOINT: "ws://browserless:3000" # marked
-      REMOTE_CONFIG: "http://rsnacos:8848/nacos/v1/cs/configs?dataId=rsshub"
+      REMOTE_CONFIG: "http://rnacos:8848/nacos/v1/cs/configs?dataId=rsshub"
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:1200/healthz" ]
       interval: 30s
@@ -23,7 +23,7 @@ services:
     depends_on:
       - redis
       - browserless # marked
-      - rsnacos
+      - rnacos
 
   browserless: # marked
     image: browserless/chrome # marked
@@ -58,9 +58,12 @@ services:
     command: [ "/bin/sh", "-c", "while true; do sleep 60; docker ps -q -f health=unhealthy | xargs --no-run-if-empty docker restart; done" ]
     restart: unless-stopped
 
-  rsnacos:
-    image: qingpan/rnacos:stable
+  rnacos:
+    image: qingpan/rnacos:stable-alpine
     restart: unless-stopped
+    volumes:
+      - ./rnacos/io:/io:rw
+      - ./rnacos/localtime:/etc/localtime:ro
     ports:
       - "10848:10848"
 volumes:

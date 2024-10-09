@@ -17,7 +17,12 @@ const handler: Handler = async (ctx) => {
                 },
             });
             const content_md5 = response.headers.get('content-md5');
-            const hash = await fs.readFile(path.join(process.cwd(), 'rsshub-remote-config'), { encoding: 'utf-8' });
+            const p = path.join(process.cwd(), 'rsshub-remote-config');
+            const file_exist = await fs
+                .access(p)
+                .then(() => true)
+                .catch(() => false);
+            const hash = (file_exist && (await fs.readFile(p, { encoding: 'utf-8' }))) || undefined;
             // - file exist
             //   - hash not exist, return 500
             //   - hash exist, compare
