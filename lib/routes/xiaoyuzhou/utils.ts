@@ -3,16 +3,17 @@
 import { config } from '@/config';
 import cache from '@/utils/cache';
 import got from '@/utils/got';
-import { FetchError, ofetch } from 'ofetch';
+import { FetchError, FetchOptions, ofetch } from 'ofetch';
 import logger from '@/utils/logger';
+import { Asset } from './types';
 
 const REFRESH_TOKEN_KEY = 'XIAOYUZHOU_TOKEN';
 const ACCESS_TOKEN_KEY = 'XIAOYUZHOU_ACCESS_TOKEN';
 
 const COMMON_HEADERS = {
-    applicationid: 'app.podcast.cosmos',
-    'app-version': '2.50.1',
-    'user-agent': 'okhttp/4.7.2',
+    bundleid: 'app.podcast.cosmos',
+    'app-version': '2.77.1',
+    'user-agent': 'Xiaoyuzhou/2.77.1 (build:2048; iOS 18.0.0)',
 };
 
 const getDeviceId = () => config.xiaoyuzhou.device_id;
@@ -26,8 +27,9 @@ const getAccessToken = async (): Promise<string | null> => {
     return access_token;
 };
 
-export async function authFetch(api: string, method = 'get') {
+export async function authFetch(api: string, method = 'get', options: FetchOptions = {}) {
     return await ofetch(api, {
+        ...options,
         method,
         headers: {
             ...COMMON_HEADERS,
@@ -35,10 +37,12 @@ export async function authFetch(api: string, method = 'get') {
             'x-jike-device-id': getDeviceId()!,
         },
     }).catch(async (error: FetchError) => {
+        logger.error(JSON.stringify(options));
+        logger.error(error.message);
         if (error.statusCode === 401) {
-            logger.error(error.message);
             const { access_token } = await refreshToken();
             return await ofetch(api, {
+                ...options,
                 headers: {
                     ...COMMON_HEADERS,
                     'x-jike-access-token': access_token,
@@ -68,4 +72,20 @@ export async function refreshToken() {
         refresh_token,
         access_token,
     };
+}
+
+export async function getEpisodeMedia(item: Asset): Promise<string> {
+    if (item.isPrivateMedia) {
+        if (item.isOwned) {
+            try {
+                const api = `https://api.xiaoyuzhoufm.com/v1/private-media/get?eid=${item.eid}`;
+                const media: any = await cache.tryGet(api, () => authFetch(api), 14400);
+                return media!.data!.url;
+            } catch (error) {
+                logger.error((error as Error).message);
+            }
+        }
+        return item.trail?.segment;
+    }
+    return item.enclosure.url;
 }

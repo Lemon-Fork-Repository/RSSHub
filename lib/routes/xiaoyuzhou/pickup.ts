@@ -1,6 +1,6 @@
 import { Data, Route } from '@/types';
 import cache from '@/utils/cache';
-import { authFetch } from '@/routes/xiaoyuzhou/utils';
+import { authFetch } from './utils';
 
 const XIAOYUZHOU_ITEMS = 'xiaoyuzhou_items';
 
