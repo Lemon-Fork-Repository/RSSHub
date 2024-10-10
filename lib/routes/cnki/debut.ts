@@ -50,7 +50,8 @@ async function handler(ctx) {
     const $ = load(response.data);
     const now = new Date();
     const list = $('dd')
-        .map((_, item) => {
+        .toArray()
+        .map((item) => {
             const a_ele = $(item).find('span.name > a');
             const title = a_ele.text().trim();
             return {
@@ -60,8 +61,7 @@ async function handler(ctx) {
                 updated: now,
                 guid: generateGuid(name + title),
             } as DataItem;
-        })
-        .get();
+        });
 
     const items = await Promise.all(list.map((item) => cache.tryGet(item.guid!, () => ProcessItem(item))));
 

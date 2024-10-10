@@ -6,7 +6,8 @@ import { parseDate } from '@/utils/parse-date';
 import { generateGuid, ProcessItem } from './utils';
 import logger from '@/utils/logger';
 
-const rootUrl = 'https://navi.cnki.net';
+// navi need puppeteer
+const rootUrl = 'https://kns.cnki.net';
 
 export const route: Route = {
     path: '/journals/:name',
@@ -40,7 +41,7 @@ async function handler(ctx) {
     const time = $j('#time').attr()?.value;
     const yearListUrl = `${rootUrl}/knavi/journals/${name}/yearList`;
 
-    logger.info(`title: ${title}, time: ${time}`);
+    logger.info('期刊', { message: `title: ${title}, time: ${time}` });
 
     const { code, date } = await got
         .post(yearListUrl, {
@@ -55,7 +56,7 @@ async function handler(ctx) {
             const date = parseDate($('.yearissuepage > dl > dd > a').attr('id')?.replace('yq', '') || '', 'YYYYMM');
             return { code, date };
         });
-    logger.info(`code: ${code}, date: ${date}`);
+    logger.info('期刊', { message: `code: ${code}, date: ${date}` });
 
     const yearIssueUrl = `${rootUrl}/knavi/journals/${name}/papers?yearIssue=${code}&pageIdx=0&pcode=CJFD,CCJD`;
     const response = await got.post(yearIssueUrl);
@@ -63,23 +64,19 @@ async function handler(ctx) {
     const $ = load(response.data);
     const publications = $('dd');
 
-    const now = new Date();
-    const list: DataItem[] = publications
-        .map((_, publication) => {
-            const title = $(publication).find('a').first().text();
-            const link = $(publication).find('a').attr('href');
-            const author = $(publication).find('span.author').text();
+    const list: DataItem[] = publications.toArray().map((publication) => {
+        const title = $(publication).find('a').first().text();
+        const link = $(publication).find('a').attr('href');
+        const author = $(publication).find('span.author').text();
 
-            return {
-                title,
-                link,
-                author,
-                pubDate: date,
-                updated: now,
-                guid: generateGuid(title + name),
-            } as DataItem;
-        })
-        .get();
+        return {
+            title,
+            link,
+            author,
+            pubDate: date,
+            guid: generateGuid(title + name),
+        } as DataItem;
+    });
 
     const items = await Promise.all(list.map((item) => cache.tryGet(item.guid!, () => ProcessItem(item))));
 
