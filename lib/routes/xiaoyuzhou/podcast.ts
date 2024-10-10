@@ -1,7 +1,8 @@
-import { Route, ViewType } from '@/types';
+import { Data, Route, ViewType } from '@/types';
 import got from '@/utils/got';
 import { load } from 'cheerio';
 import { parseDate } from '@/utils/parse-date';
+import { Context } from 'hono';
 
 export const route: Route = {
     path: '/podcast/:id',
@@ -22,41 +23,44 @@ export const route: Route = {
             source: ['xiaoyuzhoufm.com/podcast/:id'],
         },
     ],
-    name: '播客',
+    name: '播客节目',
     maintainers: ['hondajojo', 'jtsang4'],
     handler,
     url: 'xiaoyuzhoufm.com/',
 };
 
-async function handler(ctx) {
+async function handler(ctx: Context) {
     const link = `https://www.xiaoyuzhoufm.com/podcast/${ctx.req.param('id')}`;
-    const response = await got({
-        method: 'get',
-        url: link,
-    });
+    const response = await got(link);
 
     const $ = load(response.data);
 
-    const page_data = JSON.parse($('#__NEXT_DATA__')[0].children[0].data);
+    const page_data = JSON.parse($('#__NEXT_DATA__').text());
 
-    const episodes = page_data.props.pageProps.podcast.episodes.map((item) => ({
-        title: item.title,
-        enclosure_url: item.enclosure.url,
-        itunes_duration: item.duration,
-        enclosure_type: 'audio/mpeg',
-        link: `https://www.xiaoyuzhoufm.com/episode/${item.eid}`,
-        pubDate: parseDate(item.pubDate),
-        description: item.shownotes,
-        itunes_item_image: (item.image || item.podcast?.image)?.smallPicUrl,
-    }));
+    ctx.set('json', page_data);
+
+    const podcast = page_data.props.pageProps.podcast;
+
+    const episodes =
+        podcast?.episodes?.map((item) => ({
+            title: item.title,
+            enclosure_url: item.enclosure.url,
+            itunes_duration: item.duration,
+            enclosure_type: 'audio/mpeg',
+            link: `https://www.xiaoyuzhoufm.com/episode/${item.eid}`,
+            pubDate: parseDate(item.pubDate),
+            description: item.shownotes,
+            itunes_item_image: (item.image || item.podcast?.image)?.smallPicUrl,
+        })) || [];
 
     return {
-        title: page_data.props.pageProps.podcast.title,
-        link: `https://www.xiaoyuzhoufm.com/podcast/${page_data.props.pageProps.podcast.pid}`,
-        itunes_author: page_data.props.pageProps.podcast.author,
+        title: podcast?.title,
+        link: `https://www.xiaoyuzhoufm.com/podcast/${podcast?.pid}`,
+        itunes_author: podcast?.author,
         itunes_category: '',
-        image: page_data.props.pageProps.podcast.image.smallPicUrl,
+        image: podcast?.image.smallPicUrl,
         item: episodes,
-        description: page_data.props.pageProps.podcast.description,
-    };
+        description: podcast?.description,
+        allowEmpty: true,
+    } as Data;
 }

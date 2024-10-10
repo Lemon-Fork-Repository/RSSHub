@@ -1,51 +1,20 @@
-import { Route } from '@/types';
+import { Data, Route } from '@/types';
 import cache from '@/utils/cache';
-import got from '@/utils/got';
-import { config } from '@/config';
+import { authFetch } from '@/routes/xiaoyuzhou/utils';
 
 const XIAOYUZHOU_ITEMS = 'xiaoyuzhou_items';
 
-const isToday = (date) => {
+const isToday = (date: Date | string) => {
     date = new Date(date);
     const today = new Date();
     return date.getDate() === today.getDate() && date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear();
 };
 
 const ProcessFeed = async () => {
-    const device_id = config.xiaoyuzhou.device_id || 'f5d56d9a-8530-49a4-a6d2-cfb4b7a31240';
-    const refresh_token =
-        (await cache.get('XIAOYUZHOU_TOKEN')) ||
-        config.xiaoyuzhou.refresh_token ||
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjoiVzhieXB2dTJtT24xZWNqcEppN2p6R2xhMDBhMHYxellLaHFcL0ZXVWVkdDcxNlh3bnJnOFE0cFpGbVJmVFJQQ29ESWsxMmVuY3RcLzNqQWNjeFU3aTZNbkM4MUtWcUlmWWJJbVBKdXJDTXVYc1dHa2x0SE5TK3llNnJvTldLSWN1M1ZFTGY5WFE0cGhnK2crQld6bFloM2g0VUtONlNKWWlUSGtkaHowd0RJYXIrdTlzOE5PaEJPYXdJXC80NEFZcW41RjJqUXNnU3o1TExDSGtuTENuUFppRXllaTNwcVFwRkgweWFWbk03bmQ2RFhrUmVmUExVMTVpMXcwRnpkXC9wWDEiLCJ2IjozLCJpdiI6IkJiVGFjXC9KTG9BU1NYY0tPMkk3M0JBPT0iLCJpYXQiOjE1OTQ1NzIyOTEuODE2fQ.aQm7A6A1R3P94s88vWBWTbIeek9nJ-q9ztfCB7o1uK0';
+    const response = await authFetch('https://api.xiaoyuzhoufm.com/v1/editor-pick/list', 'post');
 
-    const headers = {
-        applicationid: 'app.podcast.cosmos',
-        'app-version': '1.6.0',
-        'x-jike-device-id': device_id,
-        'user-agent': 'okhttp/4.7.2',
-    };
-
-    const token_updated = await got({
-        method: 'post',
-        url: 'https://api.xiaoyuzhoufm.com/app_auth_tokens.refresh',
-        headers: {
-            ...headers,
-            'x-jike-refresh-token': refresh_token,
-        },
-    });
-    cache.set('XIAOYUZHOU_TOKEN', token_updated.data['x-jike-refresh-token']);
-
-    const response = await got({
-        method: 'post',
-        url: 'https://api.xiaoyuzhoufm.com/v1/editor-pick/list',
-        headers: {
-            ...headers,
-            'x-jike-access-token': token_updated.data['x-jike-access-token'],
-        },
-    });
-
-    const data = response.data.data;
-    const playList = [];
+    const data = response.data;
+    const playList: any[] = [];
     for (const dailyPicks of data) {
         const pubDate = new Date(dailyPicks.date + ' 00:00:00 +0800').toUTCString();
         for (const pick of dailyPicks.picks) {
@@ -81,13 +50,14 @@ const ProcessFeed = async () => {
 
 export const route: Route = {
     path: '/',
+    example: '/',
     radar: [
         {
             source: ['xiaoyuzhoufm.com/'],
             target: '',
         },
     ],
-    name: 'Unknown',
+    name: '编辑精选',
     maintainers: ['prnake', 'Maecenas'],
     handler,
     url: 'xiaoyuzhoufm.com/',
@@ -95,7 +65,7 @@ export const route: Route = {
 
 async function handler() {
     let resultItems = await cache.tryGet(XIAOYUZHOU_ITEMS, () => ProcessFeed());
-    if (!isToday(resultItems[0].pubDate)) {
+    if (!isToday(resultItems![0].pubDate)) {
         // force refresh cache
         resultItems = await ProcessFeed();
         cache.set(XIAOYUZHOU_ITEMS, resultItems);
@@ -108,5 +78,5 @@ async function handler() {
         itunes_author: '小宇宙',
         itunes_category: 'Society & Culture',
         item: resultItems,
-    };
+    } as Data;
 }
