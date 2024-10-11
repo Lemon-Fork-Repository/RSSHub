@@ -29,21 +29,28 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  deployment:
+    needs: docker
+    runs-on: ubuntu-latest
+    steps:
       - name: Load secret
+        id: op-load-secret
         uses: 1password/load-secrets-action@v2
-        with: # Export loaded secrets as environment variables
-          export-env: true
+        with:
+          export-env: false
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-          SECRET: 'op://dev/ycymakxkz7xzovg6arjqzldocq/private key'
+          HOST_NAME: 'op://dev/ycymakxkz7xzovg6arjqzldocq/hostname'
+          HOST_KEY: 'op://dev/ycymakxkz7xzovg6arjqzldocq/private key'
 
-      - name: deployment
+      - name: Update docker compose
         uses: appleboy/ssh-action@v1.1.0
         with:
-          host: ${{ secrets.MY_HOST }}
+          host: ${{ steps.op-load-secret.outputs.HOST_NAME }}
           username: root
-          key: ${{ env.SECRET }}
+          key: ${{ steps.op-load-secret.outputs.HOST_KEY }}
           script: |
             cd ~/docker/rsshub
-            docker compose pull
+            docker compose pull rsshub
+            docker image prune -f
             docker compose up -d
