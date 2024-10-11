@@ -1,4 +1,4 @@
-import { type NotFoundHandler, type ErrorHandler } from 'hono';
+import { type ErrorHandler, type NotFoundHandler } from 'hono';
 import { getDebugInfo, setDebugInfo } from '@/utils/debug-info';
 import { config } from '@/config';
 import * as Sentry from '@sentry/node';
@@ -8,6 +8,8 @@ import Error from '@/views/error';
 import NotFoundError from './types/not-found';
 
 import { requestMetric } from '@/utils/otel';
+import { gitHash } from '@/utils/git-hash';
+import { getConnInfo } from '@hono/node-server/conninfo';
 
 export const errorHandler: ErrorHandler = (error, ctx) => {
     const requestPath = ctx.req.path;
@@ -35,13 +37,6 @@ export const errorHandler: ErrorHandler = (error, ctx) => {
     hasMatchedRoute && debug.errorRoutes[matchedRoute]++;
     setDebugInfo(debug);
 
-    if (config.sentry.dsn) {
-        Sentry.withScope((scope) => {
-            scope.setTag('name', requestPath.split('/')[1]);
-            Sentry.captureException(error);
-        });
-    }
-
     let errorMessage = process.env.NODE_ENV === 'production' ? error.message : error.stack || error.message;
     switch (error.constructor.name) {
         case 'HTTPError':
@@ -65,6 +60,20 @@ export const errorHandler: ErrorHandler = (error, ctx) => {
             break;
     }
     const message = `${error.name}: ${errorMessage}`;
+
+    if (config.sentry.dsn) {
+        const ip = getConnInfo(ctx);
+        Sentry.withScope((scope) => {
+            scope.setTags({
+                name: requestPath.split('/')[1],
+                release: gitHash,
+                status_code: ctx.get('status'),
+                url: requestPath,
+                ip: ip.remote.address,
+            });
+            Sentry.captureException(error);
+        });
+    }
 
     logger.error(`Error in ${requestPath}: ${message}`);
     requestMetric.error({ path: matchedRoute, method: ctx.req.method, status: ctx.res.status });
