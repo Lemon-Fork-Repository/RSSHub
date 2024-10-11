@@ -2,10 +2,7 @@ import type { MiddlewareHandler } from 'hono';
 import { config } from '@/config';
 import md5 from '@/utils/md5';
 import RejectError from '@/errors/types/reject';
-
-const reject = () => {
-    throw new RejectError('Authentication failed. Access denied.');
-};
+import { getConnInfo } from '@hono/node-server/conninfo';
 
 const middleware: MiddlewareHandler = async (ctx, next) => {
     const requestPath = ctx.req.path;
@@ -16,7 +13,15 @@ const middleware: MiddlewareHandler = async (ctx, next) => {
         await next();
     } else {
         if (config.accessKey && !(config.accessKey === accessKey || accessCode === md5(requestPath + config.accessKey))) {
-            return reject();
+            const ip = getConnInfo(ctx);
+            throw new RejectError('Authentication failed. Access denied.', {
+                cause: {
+                    requestPath,
+                    ip,
+                    accessKey,
+                    accessCode,
+                },
+            });
         }
         await next();
     }
