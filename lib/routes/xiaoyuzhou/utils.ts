@@ -85,7 +85,7 @@ export async function getEpisodeMedia(item: Asset): Promise<string> {
                 logger.error((error as Error).message);
             }
         }
-        return item.trail?.segment;
+        return item.trial.segment;
     }
     return item.enclosure.url;
 }

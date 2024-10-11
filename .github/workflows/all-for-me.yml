@@ -28,3 +28,22 @@ jobs:
           tags: '${{ secrets.DOCKER_REGISTRY }}/${{ secrets.DOCKER_TAGS }}:latest'
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Load secret
+        uses: 1password/load-secrets-action@v2
+        with: # Export loaded secrets as environment variables
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          SECRET: 'op://dev/ycymakxkz7xzovg6arjqzldocq/private key'
+
+      - name: deployment
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ secrets.MY_HOST }}
+          username: root
+          key: ${{ env.SECRET }}
+          script: |
+            cd ~/docker/rsshub
+            docker compose pull
+            docker compose up -d

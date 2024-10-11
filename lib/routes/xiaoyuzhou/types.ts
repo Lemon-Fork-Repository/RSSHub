@@ -19,7 +19,7 @@ export type Asset = {
     };
     isPrivateMedia: boolean;
     isOwned: boolean;
-    trail: {
+    trial: {
         segment: string;
     };
 };
