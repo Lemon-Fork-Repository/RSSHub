@@ -1,6 +1,7 @@
 import { parseDate } from '@/utils/parse-date';
 import title from 'title';
 import os from 'os';
+import fs from 'node:fs/promises';
 
 // convert a string into title case
 const toTitleCase = (str: string) => title(str);
@@ -43,4 +44,10 @@ const getLocalhostAddress = () => {
     return address;
 };
 
-export { toTitleCase, collapseWhitespace, convertDateToISO8601, getSubPath, getLocalhostAddress };
+const fileExist = async (p: string) =>
+    await fs
+        .access(p)
+        .then(() => true)
+        .catch(() => false);
+
+export { toTitleCase, collapseWhitespace, convertDateToISO8601, getSubPath, getLocalhostAddress, fileExist };

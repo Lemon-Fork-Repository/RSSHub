@@ -3,6 +3,7 @@ import { ofetch } from 'ofetch';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import logger from '@/utils/logger';
+import { fileExist } from '@/utils/common-utils';
 
 const envs = process.env;
 
@@ -18,10 +19,7 @@ const handler: Handler = async (ctx) => {
             });
             const content_md5 = response.headers.get('content-md5');
             const p = path.join(process.cwd(), 'rsshub-remote-config');
-            const file_exist = await fs
-                .access(p)
-                .then(() => true)
-                .catch(() => false);
+            const file_exist = await fileExist(p);
             const hash = (file_exist && (await fs.readFile(p, { encoding: 'utf-8' }))) || undefined;
             // - file exist
             //   - hash not exist, return 500

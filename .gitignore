@@ -30,4 +30,7 @@ package-lock.json
 # pnpm-lock.yaml
 yarn.lock
 yarn-error.log
+
+# rsshub auxiliary files
 rsshub-remote-config
+gitcommited
