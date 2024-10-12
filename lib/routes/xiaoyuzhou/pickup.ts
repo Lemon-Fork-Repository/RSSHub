@@ -11,7 +11,7 @@ const isToday = (date: Date | string) => {
 };
 
 const ProcessFeed = async () => {
-    const response = await authFetch('https://api.xiaoyuzhoufm.com/v1/editor-pick/list', 'post');
+    const response = await authFetch('https://api.xiaoyuzhoufm.com/v1/editor-pick/list', { method: 'post' });
 
     const data = response.data;
     const playList: any[] = [];

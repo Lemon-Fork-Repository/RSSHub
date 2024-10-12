@@ -79,7 +79,8 @@ async function apiHandler(ctx: Context) {
     const pid = ctx.req.param('id');
     const { order = 'desc' } = ctx.req.query();
 
-    const assets: Asset[] = await authFetch(`https://api.xiaoyuzhoufm.com/v1/episode/list`, 'post', {
+    const assets: Asset[] = await authFetch(`https://api.xiaoyuzhoufm.com/v1/episode/list`, {
+        method: 'post',
         body: {
             pid,
             order,

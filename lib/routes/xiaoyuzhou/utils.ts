@@ -27,10 +27,9 @@ const getAccessToken = async (): Promise<string | null> => {
     return access_token;
 };
 
-export async function authFetch(api: string, method = 'get', options: FetchOptions = {}) {
+export async function authFetch(api: string, options: FetchOptions = {}) {
     return await ofetch(api, {
         ...options,
-        method,
         headers: {
             ...COMMON_HEADERS,
             'x-jike-access-token': (await getAccessToken())!,

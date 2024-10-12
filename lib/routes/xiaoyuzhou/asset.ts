@@ -14,7 +14,7 @@ export const route: Route = {
 };
 
 export async function handler(ctx: Context) {
-    const res = await authFetch('https://api.xiaoyuzhoufm.com/v1/asset/list', 'post');
+    const res = await authFetch('https://api.xiaoyuzhoufm.com/v1/asset/list', { method: 'post' });
     ctx.set('json', res);
     const data: Asset[] | null = res?.data;
 
