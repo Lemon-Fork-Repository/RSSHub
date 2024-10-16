@@ -81,7 +81,7 @@ async function handler(ctx) {
     const items = await Promise.all(list.map((item) => cache.tryGet(item.guid!, () => ProcessItem(item))));
 
     return {
-        title: `期刊 ${title}`,
+        title: `期刊 - ${title}`,
         link: journalUrl,
         item: items,
     } as Data;

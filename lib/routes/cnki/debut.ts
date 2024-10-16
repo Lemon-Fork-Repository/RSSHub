@@ -4,6 +4,9 @@ import got from '@/utils/got';
 import { load } from 'cheerio';
 import { parseDate } from '@/utils/parse-date';
 import { generateGuid, ProcessItem } from '@/routes/cnki/utils';
+import parser from '@/utils/rss-parser';
+import logger from '@/utils/logger';
+import { Context } from 'hono';
 
 const rootUrl = 'https://kns.cnki.net';
 
@@ -30,9 +33,55 @@ export const route: Route = {
     handler,
 };
 
-async function handler(ctx) {
+async function handler(ctx: Context) {
+    const new_way = ctx.req.query('new');
+    if (new_way) {
+        try {
+            // using cnki rss link
+            return await handleRss(ctx);
+        } catch (error) {
+            logger.error('网络首发', { message: error });
+            // downgrade to old method
+            return await handleApi(ctx);
+        }
+    } else {
+        return await handleApi(ctx);
+    }
+}
+
+async function handleRss(ctx: Context) {
     const name = ctx.req.param('name');
 
+    // https://rss.cnki.net/kns/rss.aspx?Journal=LKGP&Virtual=knavi
+    // https://navi.cnki.net/knavi/rss/LKGP
+    const string = await fetch(`https://rss.cnki.net/kns/rss.aspx?Journal=LKGP&Virtual=knavi`).then((res) => res.text());
+    const feed = await parser.parseString(string);
+    ctx.set('json', feed);
+
+    const items = feed.items.map(
+        (item) =>
+            ({
+                title: item.title,
+                link: item.link,
+                author: item.creator,
+                description: item.content,
+                pubDate: item.pubDate, // fixme: `pubDate` is not journal publish date
+                guid: generateGuid(name + item.title),
+            }) as DataItem
+    );
+
+    return {
+        title: `全网首发 - ${feed.title}`,
+        description: feed.description,
+        link: feed.link,
+        allowEmpty: true,
+        image: feed.image?.url,
+        item: items,
+    } as Data;
+}
+
+async function handleApi(ctx: Context) {
+    const name = ctx.req.param('name');
     const journalUrl = `${rootUrl}/knavi/journals/${name}/detail`;
     const title = await got.get(journalUrl).then((res) => load(res.data)('head > title').text());
 
@@ -48,7 +97,6 @@ async function handler(ctx) {
         },
     });
     const $ = load(response.data);
-    const now = new Date();
     const list = $('dd')
         .toArray()
         .map((item) => {
@@ -58,7 +106,6 @@ async function handler(ctx) {
                 title,
                 link: a_ele.attr('href'),
                 pubDate: parseDate($(item).find('span.company').text(), 'YYYY-MM-DD HH:mm:ss'),
-                updated: now,
                 guid: generateGuid(name + title),
             } as DataItem;
         });
