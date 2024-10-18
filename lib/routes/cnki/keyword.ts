@@ -1,12 +1,12 @@
 import { Data, DataItem, Route } from '@/types';
-import logger from '@/utils/logger';
 import got from '@/utils/got';
 import { load } from 'cheerio';
 import cache from '@/utils/cache';
 import { generateGuid, ProcessItem } from '@/routes/cnki/utils';
+import { Context } from 'hono';
 
 export const route: Route = {
-    path: '/keyword/:keyword/:categories?',
+    path: '/keyword/:keyword',
     categories: ['journal'],
     example: '/cnki/keyword/室内设计',
     parameters: {
@@ -26,9 +26,9 @@ export const route: Route = {
     handler,
 };
 
-const map_type = {
-    SI: 'SCI来源期刊',
-    EI: 'EI来源期刊',
+const map_type: Record<string, string> = {
+    SI: 'SCI',
+    EI: 'EI',
     HX: '北大核心',
     CSI: 'CSSCI',
     CSD: 'CSCD',
@@ -37,10 +37,65 @@ const map_type = {
 
 const rootUrl = 'https://kns.cnki.net';
 
-async function handler(ctx): Promise<Data> {
-    const { keyword, categories } = ctx.req.param();
-    let groups =
-        categories?.split(',')?.map((category, index) => ({
+async function handler(ctx: Context): Promise<Data> {
+    const { keyword } = ctx.req.param();
+    const categories = ctx.req.queries('categories');
+
+    const query_json = assembleQueryJson(keyword, categories);
+    ctx.set('json', query_json);
+
+    const categories_str = categories ? '  来源类别：' + categories.map((category: string) => map_type[category]).join(',') + '; ' : '';
+
+    const res = await got.post(`${rootUrl}/kns8s/brief/grid`, {
+        headers: {
+            Referer: 'https://kns.cnki.net/kns8s/AdvSearch',
+        },
+        form: {
+            boolSearch: false,
+            QueryJson: JSON.stringify(query_json, null, -1),
+            pageNum: 1,
+            pageSize: 20,
+            sortField: 'PT',
+            sortType: 'desc',
+            dstyle: 'listmode',
+            boolSortSearch: 'false',
+            aside: '',
+            searchFrom: `资源范围：学术期刊;  中英文扩展;  时间范围：更新时间：不限;${categories_str}`,
+        },
+    });
+
+    const $ = load(res.data);
+    const list = $('#gridTable tbody tr')
+        .toArray()
+        .map((data) => {
+            const row = $(data);
+            const title = row.find('.name > a').text();
+            const link = row.find('.name > a').attr('href') || '';
+            const author_name = row.find('.author').text();
+            const date = row.find('.date').text();
+
+            return {
+                title,
+                link,
+                author: author_name,
+                pubDate: date,
+                guid: generateGuid(title + author_name),
+            } as DataItem;
+        });
+
+    const items = await Promise.all(list.map((item) => cache.tryGet(item.guid!, () => ProcessItem(item))));
+
+    return {
+        title: `知网 - ${keyword}` + (categories ? ` - ${categories}` : ''),
+        link: `${rootUrl}/kns8s/AdvSearch`,
+        allowEmpty: true,
+        item: items,
+    } as Data;
+}
+
+function assembleQueryJson(keyword: string, categories: string[] | undefined) {
+    let groups: any =
+        categories?.map((category: string, index: number) => ({
             Key: index,
             Title: map_type[category],
             Logic: 1,
@@ -62,9 +117,7 @@ async function handler(ctx): Promise<Data> {
         ];
     }
 
-    logger.info(JSON.stringify(groups));
-
-    const query_josn = {
+    return {
         Platform: '',
         Resource: 'JOURNAL',
         Classid: 'YSTT4HG0',
@@ -109,47 +162,7 @@ async function handler(ctx): Promise<Data> {
         SearchType: 1,
         Rlang: 'CHINESE',
         KuaKuCode: '',
-        View: 'changeDBAll',
+        View: 'changeDBCh',
         SearchFrom: 1,
     };
-
-    const res = await got.post(`${rootUrl}/kns8s/brief/grid`, {
-        form: {
-            boolSortSearch: 'true',
-            QueryJson: JSON.stringify(query_josn),
-            pageNum: 1,
-            pageSize: 20,
-            sortField: 'PT',
-            sortType: 'desc',
-        },
-    });
-
-    const now = new Date();
-    const $ = load(res.data);
-    const list = $('#gridTable tbody tr')
-        .map((_, data) => {
-            const row = $(data);
-            const title = row.find('.name > a').text();
-            const link = row.find('.name > a').attr('href') || '';
-            const author_name = row.find('.author').text();
-            const date = row.find('.date').text();
-
-            return {
-                title,
-                link,
-                author: author_name,
-                pubDate: date,
-                updated: now,
-                guid: generateGuid(title + author_name),
-            } as DataItem;
-        })
-        .get();
-
-    const items = await Promise.all(list.map((item) => cache.tryGet(item.guid!, () => ProcessItem(item))));
-
-    return {
-        title: `知网 - ${keyword}` + (categories ? ` - ${categories}` : ''),
-        link: `${rootUrl}/kns8s/AdvSearch`,
-        item: items,
-    } as Data;
 }
