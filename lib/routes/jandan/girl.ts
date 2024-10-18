@@ -1,11 +1,14 @@
 import { Data, DataItem, Route, ViewType } from '@/types';
 import { Context } from 'hono';
 import ofetch from '@/utils/ofetch';
+import path from 'node:path';
+import { art } from '@/utils/render';
+import { getCurrentPath } from '@/utils/helpers';
 
 export const route: Route = {
-    path: '/mzt',
+    path: '/girl',
     name: '煎蛋妹子图',
-    example: '/mzt',
+    example: '/girl',
     maintainers: ['lemon'],
     handler,
     view: ViewType.Pictures,
@@ -18,7 +21,7 @@ async function handler(ctx: Context): Promise<Data> {
 
     return {
         title: '妹子图 - 煎蛋',
-        link: 'https://jandan.net/mzt',
+        link: 'https://jandan.net',
         item: items,
     };
 }
@@ -29,6 +32,9 @@ async function crawl(ctx: Context, limit: number = 30) {
     ctx.set('json', data);
     return data;
 }
+
+const __dirname = getCurrentPath(import.meta.url);
+const template_file = path.join(__dirname, 'templates/girl.art');
 
 async function _crawl(start_id?: string, limit: number = 30, items: DataItem[] = []): Promise<DataItem[]> {
     if (items.length >= limit) {
@@ -49,7 +55,7 @@ async function _crawl(start_id?: string, limit: number = 30, items: DataItem[] =
         (item) =>
             ({
                 title: item.author,
-                description: item.images.map((image) => `<p><a href="${image.full_url}">[查看原图]</a><br><img alt="原图" src="${image.url}" referrerpolicy="no-referrer" /></p>`).join(''),
+                description: art(template_file, { images: item.images }),
                 pubDate: new Date(item.date),
                 link: `https://jandan.net/t/${item.id}`,
                 author: item.author,
