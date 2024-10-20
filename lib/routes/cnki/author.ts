@@ -52,7 +52,7 @@ async function handler(ctx: Context) {
     } else {
         // downgrade to loop all authors
         const cached_author_name = await cache.get(`cnki:author:${code}`);
-        const __ret = await (cached_author_name ? findByName($, name, regex) : findByCode($, regex, code));
+        const __ret = await (cached_author_name ? findByName($, cached_author_name, regex) : findByCode($, regex, code));
         author_name = __ret.author_name;
         company_name = __ret.company_name;
         v_code = __ret.v_code;
