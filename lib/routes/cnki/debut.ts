@@ -54,7 +54,7 @@ async function handleRss(ctx: Context) {
 
     // https://rss.cnki.net/kns/rss.aspx?Journal=LKGP&Virtual=knavi
     // https://navi.cnki.net/knavi/rss/LKGP
-    const string = await fetch(`https://rss.cnki.net/kns/rss.aspx?Journal=LKGP&Virtual=knavi`).then((res) => res.text());
+    const string = await fetch(`https://rss.cnki.net/kns/rss.aspx?Journal=${name}&Virtual=knavi`).then((res) => res.text());
     const feed = await parser.parseString(string);
     ctx.set('json', feed);
 
