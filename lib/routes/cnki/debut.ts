@@ -83,7 +83,13 @@ async function handleRss(ctx: Context) {
 async function handleApi(ctx: Context) {
     const name = ctx.req.param('name');
     const journalUrl = `${rootUrl}/knavi/journals/${name}/detail`;
-    const title = await got.get(journalUrl).then((res) => load(res.data)('head > title').text());
+    const { title, cover } = await got.get(journalUrl).then((res) => {
+        const $ = load(res.data);
+        return {
+            title: $('head > title').text().trim(),
+            cover: $('img.pic-book').attr('src'),
+        };
+    });
 
     const outlineUrl = `${rootUrl}/knavi/journals/${name}/papers/outline`;
     const response = await got({
@@ -115,6 +121,7 @@ async function handleApi(ctx: Context) {
     return {
         title: `${title} - 全网首发`,
         link: `https://navi.cnki.net/knavi/journals/${name}/detail`,
+        image: `https:${cover}`,
         allowEmpty: true,
         item: items,
     } as Data;
