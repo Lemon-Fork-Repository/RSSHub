@@ -1,7 +1,10 @@
 import { createFetch } from 'ofetch';
 import { config } from '@/config';
 import logger from '@/utils/logger';
+import { register } from 'node-network-devtools';
 import { Agent } from 'undici';
+
+config.enableRemoteDebugging && process.env.NODE_ENV === 'dev' && register();
 
 const unsecureAgent = new Agent({ connect: { rejectUnauthorized: false } });
 
@@ -29,6 +32,11 @@ const rofetch = createFetch().create({
     },
     headers: {
         'user-agent': config.ua,
+    },
+    onResponse({ request, response }) {
+        if (response.redirected) {
+            logger.http(`Redirecting to ${response.url} for ${request}`);
+        }
     },
 });
 

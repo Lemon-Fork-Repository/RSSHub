@@ -7,12 +7,14 @@ import { ofetch } from 'ofetch';
 let envs = process.env;
 
 export type Config = {
+    // app config
     disallowRobot: boolean;
     enableCluster?: string;
     isPackage: boolean;
     nodeName?: string;
     puppeteerWSEndpoint?: string;
     chromiumExecutablePath?: string;
+    // network
     connect: {
         port: number;
     };
@@ -22,6 +24,7 @@ export type Config = {
     ua: string;
     trueUA: string;
     allowOrigin?: string;
+    // cache
     cache: {
         type: string;
         requestTimeout: number;
@@ -34,6 +37,7 @@ export type Config = {
     redis: {
         url: string;
     };
+    // proxy
     proxyUri?: string;
     proxy: {
         protocol?: string;
@@ -45,7 +49,9 @@ export type Config = {
     };
     pacUri?: string;
     pacScript?: string;
+    // access control
     accessKey?: string;
+    // logging
     debugInfo: string;
     loggerLevel: string;
     noLogfiles?: boolean;
@@ -58,6 +64,8 @@ export type Config = {
         dsn?: string;
         routeTimeout: number;
     };
+    enableRemoteDebugging?: boolean;
+    // feed config
     hotlink: {
         template?: string;
         includePaths?: string[];
@@ -80,6 +88,8 @@ export type Config = {
         promptTitle: string;
         promptDescription: string;
     };
+
+    // Route-specific Configurations
     bilibili: {
         cookies: Record<string, string | undefined>;
         dmImgList?: string;
@@ -96,7 +106,13 @@ export type Config = {
     bupt: {
         portal_cookie?: string;
     };
+    caixin: {
+        cookie?: string;
+    };
     civitai: {
+        cookie?: string;
+    };
+    dianping: {
         cookie?: string;
     };
     dida365: {
@@ -152,6 +168,9 @@ export type Config = {
     };
     google: {
         fontsApiKey?: string;
+    };
+    guozaoke: {
+        cookies?: string;
     };
     hefeng: {
         key?: string;
@@ -269,8 +288,14 @@ export type Config = {
     scihub: {
         host?: string;
     };
+    sis001: {
+        baseUrl?: string;
+    };
     skeb: {
         bearerToken?: string;
+    };
+    sorrycc: {
+        cookie?: string;
     };
     spotify: {
         clientId?: string;
@@ -282,6 +307,15 @@ export type Config = {
     };
     telegram: {
         token?: string;
+        session?: string;
+        apiId?: number;
+        apiHash?: string;
+        maxConcurrentDownloads?: number;
+        proxy?: {
+            host?: string;
+            port?: number;
+            secret?: string;
+        };
     };
     tophub: {
         cookie?: string;
@@ -293,6 +327,7 @@ export type Config = {
         username?: string[];
         password?: string[];
         authenticationSecret?: string[];
+        phoneOrEmail?: string[];
         authToken?: string[];
     };
     uestc: {
@@ -393,24 +428,18 @@ const calculateValue = () => {
         isPackage: !!envs.IS_PACKAGE,
         nodeName: envs.NODE_NAME,
         puppeteerWSEndpoint: envs.PUPPETEER_WS_ENDPOINT,
-        chromiumExecutablePath: envs.CHROMIUM_EXECUTABLE_PATH, // network
+        chromiumExecutablePath: envs.CHROMIUM_EXECUTABLE_PATH,
+        // network
         connect: {
             port: toInt(envs.PORT, 1200), // 监听端口
         },
         listenInaddrAny: toBoolean(envs.LISTEN_INADDR_ANY, true), // 是否允许公网连接，取值 0 1
         requestRetry: toInt(envs.REQUEST_RETRY, 2), // 请求失败重试次数
         requestTimeout: toInt(envs.REQUEST_TIMEOUT, 30000), // Milliseconds to wait for the server to end the response before aborting the request
-        ua:
-            envs.UA ??
-            (toBoolean(envs.NO_RANDOM_UA, false)
-                ? TRUE_UA
-                : randUserAgent({
-                      browser: 'chrome',
-                      os: 'mac os',
-                      device: 'desktop',
-                  })),
-        trueUA: TRUE_UA, // cors request
-        allowOrigin: envs.ALLOW_ORIGIN, // cache
+        ua: envs.UA ?? (toBoolean(envs.NO_RANDOM_UA, false) ? TRUE_UA : randUserAgent({ browser: 'chrome', os: 'mac os', device: 'desktop' })),
+        trueUA: TRUE_UA,
+        allowOrigin: envs.ALLOW_ORIGIN,
+        // cache
         cache: {
             type: envs.CACHE_TYPE || (envs.CACHE_TYPE === '' ? '' : 'memory'), // 缓存类型，支持 'memory' 和 'redis'，设为空可以禁止缓存
             requestTimeout: toInt(envs.CACHE_REQUEST_TIMEOUT, 60),
@@ -423,7 +452,8 @@ const calculateValue = () => {
         },
         redis: {
             url: envs.REDIS_URL || 'redis://localhost:6379/',
-        }, // proxy
+        },
+        // proxy
         proxyUri: envs.PROXY_URI,
         proxy: {
             protocol: envs.PROXY_PROTOCOL,
@@ -434,8 +464,10 @@ const calculateValue = () => {
             strategy: envs.PROXY_STRATEGY || 'all', // all / on_retry
         },
         pacUri: envs.PAC_URI,
-        pacScript: envs.PAC_SCRIPT, // access control
-        accessKey: envs.ACCESS_KEY, // logging
+        pacScript: envs.PAC_SCRIPT,
+        // access control
+        accessKey: envs.ACCESS_KEY,
+        // logging
         // 是否显示 Debug 信息，取值 'true' 'false' 'some_string' ，取值为 'true' 时永久显示，取值为 'false' 时永远隐藏，取值为 'some_string' 时请求带上 '?debug=some_string' 显示
         debugInfo: envs.DEBUG_INFO || 'true',
         loggerLevel: envs.LOGGER_LEVEL || 'info',
@@ -448,7 +480,9 @@ const calculateValue = () => {
         sentry: {
             dsn: envs.SENTRY,
             routeTimeout: toInt(envs.SENTRY_ROUTE_TIMEOUT, 30000),
-        }, // feed config
+        },
+        enableRemoteDebugging: toBoolean(envs.ENABLE_REMOTE_DEBUGGING, false),
+        // feed config
         hotlink: {
             template: envs.HOTLINK_TEMPLATE,
             includePaths: envs.HOTLINK_INCLUDE_PATHS ? envs.HOTLINK_INCLUDE_PATHS.split(',') : undefined,
@@ -489,8 +523,14 @@ const calculateValue = () => {
         bupt: {
             portal_cookie: envs.BUPT_PORTAL_COOKIE,
         },
+        caixin: {
+            cookie: envs.CAIXIN_COOKIE,
+        },
         civitai: {
             cookie: envs.CIVITAI_COOKIE,
+        },
+        dianping: {
+            cookie: envs.DIANPING_COOKIE,
         },
         dida365: {
             username: envs.DIDA365_USERNAME,
@@ -545,6 +585,9 @@ const calculateValue = () => {
         },
         google: {
             fontsApiKey: envs.GOOGLE_FONTS_API_KEY,
+        },
+        guozaoke: {
+            cookies: envs.GUOZAOKE_COOKIES,
         },
         hefeng: {
             // weather
@@ -663,8 +706,14 @@ const calculateValue = () => {
         scihub: {
             host: envs.SCIHUB_HOST || 'https://sci-hub.se/',
         },
+        sis001: {
+            baseUrl: envs.SIS001_BASE_URL || 'https://sis001.com',
+        },
         skeb: {
             bearerToken: envs.SKEB_BEARER_TOKEN,
+        },
+        sorrycc: {
+            cookie: envs.SORRYCC_COOKIES,
         },
         spotify: {
             clientId: envs.SPOTIFY_CLIENT_ID,
@@ -680,6 +729,11 @@ const calculateValue = () => {
             apiId: envs.TELEGRAM_API_ID,
             apiHash: envs.TELEGRAM_API_HASH,
             maxConcurrentDownloads: envs.TELEGRAM_MAX_CONCURRENT_DOWNLOADS,
+            proxy: {
+                host: envs.TELEGRAM_PROXY_HOST,
+                port: envs.TELEGRAM_PROXY_PORT,
+                secret: envs.TELEGRAM_PROXY_SECRET,
+            },
         },
         tophub: {
             cookie: envs.TOPHUB_COOKIE,
@@ -691,6 +745,7 @@ const calculateValue = () => {
             username: envs.TWITTER_USERNAME?.split(','),
             password: envs.TWITTER_PASSWORD?.split(','),
             authenticationSecret: envs.TWITTER_AUTHENTICATION_SECRET?.split(','),
+            phoneOrEmail: envs.TWITTER_PHONE_OR_EMAIL?.split(','),
             authToken: envs.TWITTER_AUTH_TOKEN?.split(','),
         },
         uestc: {
