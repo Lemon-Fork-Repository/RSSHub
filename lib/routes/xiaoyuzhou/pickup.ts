@@ -31,7 +31,7 @@ const ProcessFeed = async () => {
         const pubDate = item.pubDate;
         const itunes_duration = item.episode.duration;
         const enclosure_url = item.episode.enclosure.url;
-        const desc = `<p><strong>${item.comment?.author?.nickname}：</strong>${item.comment.text}</p><hr>` + item.episode.shownotes;
+        const desc = `<p><strong>${item.comment?.author?.nickname}：</strong>${item.comment?.text}</p><hr>` + item.episode.shownotes;
         const author = item.episode.podcast.author;
 
         return {
