@@ -1,13 +1,12 @@
 import { Data, DataItem, Route } from '@/types';
 import cache from '@/utils/cache';
-import got from '@/utils/got';
 import { load } from 'cheerio';
 import { parseDate } from '@/utils/parse-date';
 import { generateGuid, ProcessItem } from './utils';
-import logger from '@/utils/logger';
+import puppeteer from '@/utils/puppeteer';
 
 // navi need puppeteer
-const rootUrl = 'https://kns.cnki.net';
+const rootUrl = 'https://navi.cnki.net';
 
 export const route: Route = {
     path: '/journals/:name',
@@ -16,7 +15,7 @@ export const route: Route = {
     parameters: { name: '期刊缩写，可以在网址中得到' },
     features: {
         requireConfig: false,
-        requirePuppeteer: false,
+        requirePuppeteer: true,
         antiCrawler: false,
         supportBT: false,
         supportPodcast: false,
@@ -35,34 +34,23 @@ export const route: Route = {
 async function handler(ctx) {
     const name = ctx.req.param('name');
     const journalUrl = `${rootUrl}/knavi/journals/${name}/detail`;
-    const journalDetail = await got(journalUrl);
-    const $j = load(journalDetail.data);
-    const title = $j('head > title').text();
-    const time = $j('#time').attr()?.value;
-    const yearListUrl = `${rootUrl}/knavi/journals/${name}/yearList`;
 
-    logger.info('期刊', { message: `title: ${title}, time: ${time}` });
+    const browser = await puppeteer({ stealth: true });
+    const page = await browser.newPage();
+    // wait for page load
+    await Promise.all([page.waitForSelector('.yearissuepage dt'), page.goto(journalUrl)]);
+    // click the latest year, and wait for the content to load
+    await Promise.all([page.click('.yearissuepage dt'), page.waitForSelector('#CataLogContent dd')]);
+    const cookies = await page.cookies().then((cookies) => cookies.map((c) => `${c.name}=${c.value}`).join('; '));
+    const content = await page.content();
 
-    const { code, date } = await got
-        .post(yearListUrl, {
-            form: {
-                pIdx: 0,
-                time,
-            },
-        })
-        .then((res) => {
-            const $ = load(res.data);
-            const code = $('.yearissuepage').find('dl').first().find('dd').find('a').first().attr('value');
-            const date = parseDate($('.yearissuepage > dl > dd > a').attr('id')?.replace('yq', '') || '', 'YYYYMM');
-            return { code, date };
-        });
-    logger.info('期刊', { message: `code: ${code}, date: ${date}` });
+    await browser.close();
 
-    const yearIssueUrl = `${rootUrl}/knavi/journals/${name}/papers?yearIssue=${code}&pageIdx=0&pcode=CJFD,CCJD`;
-    const response = await got.post(yearIssueUrl);
+    const $ = load(content);
+    const title = $('head > title').text();
 
-    const $ = load(response.data);
-    const publications = $('dd');
+    const date = parseDate($('.yearissuepage > dl > dd > a').attr('id')?.replace('yq', '') || '', 'YYYYMM');
+    const publications = $('#CataLogContent dd');
 
     const list: DataItem[] = publications.toArray().map((publication) => {
         const title = $(publication).find('a').first().text();
@@ -78,7 +66,7 @@ async function handler(ctx) {
         } as DataItem;
     });
 
-    const items = await Promise.all(list.map((item) => cache.tryGet(item.guid!, () => ProcessItem(item))));
+    const items = await Promise.all(list.map((item) => cache.tryGet(item.guid!, () => ProcessItem(item, cookies))));
 
     return {
         title: `期刊 - ${title}`,

@@ -9,9 +9,9 @@ import { DataItem } from '@/types';
 
 const __dirname = getCurrentPath(import.meta.url);
 
-const ProcessItem = async (item: DataItem) => {
+const ProcessItem = async (item: DataItem, cookie: string = '') => {
     try {
-        const detailResponse = await got(item.link);
+        const detailResponse = await got(item.link, { headers: { cookie } });
         const $ = load(detailResponse.data);
         item.description = art(path.join(__dirname, 'templates/desc.art'), {
             author: $('#authorpart > span')
