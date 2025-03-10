@@ -1,7 +1,7 @@
 import { Data, DataItem, Route } from '@/types';
 import cache from '@/utils/cache';
 import got from '@/utils/got';
-import { generateGuid, ProcessItem } from './utils';
+import { generateGuid, getCookies, ProcessItem } from './utils';
 import logger from '@/utils/logger';
 import { CheerioAPI, load } from 'cheerio';
 import { Context } from 'hono';
@@ -84,7 +84,8 @@ async function handler(ctx: Context) {
         };
     });
 
-    const items = await Promise.all(list.map((item) => cache.tryGet(item.guid!, () => ProcessItem(item))));
+    const cookies = await getCookies();
+    const items = await Promise.all(list.map((item) => cache.tryGet(item.guid!, () => ProcessItem(item, cookies))));
 
     return {
         title: `知网 ${author_name} ${company_name}`,

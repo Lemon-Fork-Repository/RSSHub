@@ -6,10 +6,12 @@ import path from 'node:path';
 import logger from '@/utils/logger';
 import crypto from 'crypto';
 import { DataItem } from '@/types';
+import puppeteer from '@/utils/puppeteer';
+import cache from '@/utils/cache';
 
 const __dirname = getCurrentPath(import.meta.url);
 
-const ProcessItem = async (item: DataItem, cookie: string = '') => {
+const ProcessItem = async (item: DataItem, cookie: string | null = '') => {
     try {
         const detailResponse = await got(item.link, { headers: { cookie } });
         const $ = load(detailResponse.data);
@@ -37,4 +39,23 @@ function generateGuid(t: string) {
     return hash.digest('hex').toUpperCase();
 }
 
-export { ProcessItem, generateGuid };
+async function getCookies(): Promise<string | null> {
+    return (await cache.tryGet(
+        'cnki:cookies',
+        async () => {
+            const browser = await puppeteer({ stealth: true });
+            const page = await browser.newPage();
+
+            const tmpUrl = 'https://navi.cnki.net/knavi/journals/LKGP/detail';
+
+            await Promise.all([page.waitForSelector('.yearissuepage dt'), page.goto(tmpUrl)]);
+            const cookies = await page.cookies().then((cookies) => cookies.map((c) => `${c.name}=${c.value}`).join('; '));
+
+            await page.close();
+            return cookies;
+        },
+        3600
+    )) as any;
+}
+
+export { ProcessItem, generateGuid, getCookies };

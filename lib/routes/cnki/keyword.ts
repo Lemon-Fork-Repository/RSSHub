@@ -2,7 +2,7 @@ import { Data, DataItem, Route } from '@/types';
 import got from '@/utils/got';
 import { load } from 'cheerio';
 import cache from '@/utils/cache';
-import { generateGuid, ProcessItem } from '@/routes/cnki/utils';
+import { generateGuid, getCookies, ProcessItem } from '@/routes/cnki/utils';
 import { Context } from 'hono';
 
 export const route: Route = {
@@ -83,7 +83,8 @@ async function handler(ctx: Context): Promise<Data> {
             } as DataItem;
         });
 
-    const items = await Promise.all(list.map((item) => cache.tryGet(item.guid!, () => ProcessItem(item))));
+    const cookies = await getCookies();
+    const items = await Promise.all(list.map((item) => cache.tryGet(item.guid!, () => ProcessItem(item, cookies))));
 
     return {
         title: `知网 - ${keyword}` + (categories ? ` - ${categories}` : ''),

@@ -44,7 +44,7 @@ async function handler(ctx) {
     const cookies = await page.cookies().then((cookies) => cookies.map((c) => `${c.name}=${c.value}`).join('; '));
     const content = await page.content();
 
-    await browser.close();
+    await page.close();
 
     const $ = load(content);
     const title = $('head > title').text();
